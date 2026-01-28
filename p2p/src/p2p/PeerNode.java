@@ -90,8 +90,6 @@ public class PeerNode implements Application {
 
     public void unicastMessage(String idStr, String content) {
         p2p.SimpleMessage msg = new p2p.SimpleMessage(endpoint.getLocalNodeHandle(), content);
-        String cleanedId = idStr.replaceAll("[<>]", "").replace("0x", "");
-        Id targetId = node.getIdFactory().buildId(cleanedId);
 
         System.out.println("you entered "+idStr);
         for (NodeHandle nh : node.getLeafSet().asList()) {
@@ -104,7 +102,30 @@ public class PeerNode implements Application {
         }
 
         System.out.println("No user with the ID number -> " + idStr);
+        return;
     }
+
+    public void multicastMessage(String[] nodeIds, String content) {
+        p2p.SimpleMessage msg = new p2p.SimpleMessage(endpoint.getLocalNodeHandle(), content);
+
+        for(String idStr : nodeIds){
+            boolean found = false;
+
+            for (NodeHandle nh : node.getLeafSet().asList()) {
+                if (nh.getId().toStringFull().equals(idStr)) {
+                    endpoint.route(msg.sender.getId(), msg, nh);
+                    System.out.println("Sending message to " + idStr + " -> " + content);
+                    found = true;
+                    break; // move to next nodeId
+                }
+            }
+
+            if(!found){
+                System.out.println("No user with the ID number -> " + idStr);
+            }
+        }
+    }
+
 
     /**
      * Allows message forwarding in the Pastry network.
@@ -172,7 +193,7 @@ public class PeerNode implements Application {
         // Wait for node initialization
         Thread.sleep(3000);
         System.out.println("PeerNode " + peer.nodeId + " is ready.");
-        System.out.println("Enter commands ('exit' to shut down, 'status' to check node info, 'broadcast <message>' to send a message to all nodes):");
+        System.out.println("Enter commands ('exit' to shut down, 'status' to check node info, 'broadcast <message>' to send a message to all nodes, 'unicast <node> <message>' to send unicast messages, 'multicast <node> ... <node> <message>' to multicast, 'get' to get information about current nodes) :");
 
         // Interactive CLI for user input
         BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
@@ -208,18 +229,37 @@ public class PeerNode implements Application {
                 String messageContent = parts[2]; // rest of the message
 
                 peer.unicastMessage(id, messageContent);
-
-            } else if(command.startsWith("add")){
-                if(node.getLeafSet().asList().isEmpty()){
-                    System.out.println("nothing");
+            } else if(command.startsWith("multicast")){
+                String[] parts = command.split(" "); // split by spaces
+                if(parts.length < 3) { // at least: multicast <id> <message>
+                    System.out.println("Usage: multicast <id1> <id2> ... <message>");
+                    continue;
                 }
 
+                // Collect node IDs until the last part (message)
+                int numIds = parts.length - 2; // all except "multicast" and message
+                String[] nodeIds = new String[numIds];
+                System.arraycopy(parts, 1, nodeIds, 0, numIds);
+
+                // Reconstruct message (everything after IDs)
+                StringBuilder sb = new StringBuilder();
+                for(int i = numIds + 1; i < parts.length; i++) {
+                    sb.append(parts[i]).append(" ");
+                }
+                String messageContent = sb.toString().trim();
+
+                peer.multicastMessage(nodeIds, messageContent);
+            } else if(command.startsWith("get")){
+                Set<String> printed = new HashSet<>();
                 for(NodeHandle nh : node.getLeafSet().asList()){
-                    System.out.println("Leaf node: " + nh.getId());
+                    String id = nh.getId().toStringFull();
+                    if(!printed.contains(id)){
+                        System.out.println("Leaf node: " + id);
+                        printed.add(id);
+                    }
                 }
-
-            }else {
-                System.out.println("Unknown command. Available commands: 'status', 'broadcast <message>', 'exit'");
+             }else {
+                System.out.println("Unknown command. Available commands: 'exit' to shut down, 'status' to check node info, 'broadcast <message>' to send a message to all nodes, 'unicast <node> <message>' to send unicast messages, 'multicast <node> ... <node> <message>' to multicast, 'get' to get information about current nodes");
             }
         }
     }

@@ -11,6 +11,7 @@ import rice.p2p.commonapi.NodeHandle;
 class SimpleMessage implements Message {
     public NodeHandle sender;
     public String content;
+    public boolean isBroadcast;
 
     // TODO: Ex 2 - Add a unique message ID to prevent duplicate broadcasts.
     // Hint: Use `UUID.randomUUID().toString()` to generate a unique ID.
@@ -26,9 +27,7 @@ class SimpleMessage implements Message {
     public SimpleMessage(NodeHandle sender, String content) {
         this.sender = sender;
         this.content = content;
-
-        // TODO: Ex 2 - Generate a unique message ID.
-        this.messageId = UUID.randomUUID().toString();
+        this.messageId = java.util.UUID.randomUUID().toString(); // UNIQUE ID
     }
 
     /**

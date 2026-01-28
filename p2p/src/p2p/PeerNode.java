@@ -62,8 +62,8 @@ public class PeerNode implements Application {
 
         // TODO: Ex 1 - If this is a broadcast message, forward it to other nodes.
         // Hint: Call `broadcastMessage(msg.content);` here if `msg.isBroadcast` is true.
-//        if(msg.isBroadcast())
-        broadcastMessage(msg.content);
+        if(msg.isBroadcast)
+            broadcastMessage(msg.content);
     }
 
     /**
@@ -88,6 +88,24 @@ public class PeerNode implements Application {
         }
     }
 
+    public void unicastMessage(String idStr, String content) {
+        p2p.SimpleMessage msg = new p2p.SimpleMessage(endpoint.getLocalNodeHandle(), content);
+        String cleanedId = idStr.replaceAll("[<>]", "").replace("0x", "");
+        Id targetId = node.getIdFactory().buildId(cleanedId);
+
+        System.out.println("you entered "+idStr);
+        for (NodeHandle nh : node.getLeafSet().asList()) {
+            System.out.println(nh.getId().toStringFull());
+            if (nh.getId().toStringFull().equals(idStr)) {
+                endpoint.route(msg.sender.getId(), msg, nh);
+                System.out.println("Unicasting to " + idStr + " message -> " + content);
+                return;
+            }
+        }
+
+        System.out.println("No user with the ID number -> " + idStr);
+    }
+
     /**
      * Allows message forwarding in the Pastry network.
      */
@@ -107,6 +125,7 @@ public class PeerNode implements Application {
             System.out.println("Node left: " + handle);
         }
     }
+
 
     /**
      * Main method to start the peer node.
@@ -178,7 +197,28 @@ public class PeerNode implements Application {
                 peer.broadcastMessage(messageContent);
                 
                 System.out.println("Broadcasting message: " + messageContent);
-            } else {
+            } else if(command.startsWith("unicast ")){
+                String[] parts = command.split(" ", 3); // split into 3 parts: "unicast", "<nodeId>", "<message>"
+                if(parts.length < 3){
+                    System.out.println("Usage: unicast <nodeId> <message>");
+                    continue;
+                }
+
+                String id = parts[1]; // node ID
+                String messageContent = parts[2]; // rest of the message
+
+                peer.unicastMessage(id, messageContent);
+
+            } else if(command.startsWith("add")){
+                if(node.getLeafSet().asList().isEmpty()){
+                    System.out.println("nothing");
+                }
+
+                for(NodeHandle nh : node.getLeafSet().asList()){
+                    System.out.println("Leaf node: " + nh.getId());
+                }
+
+            }else {
                 System.out.println("Unknown command. Available commands: 'status', 'broadcast <message>', 'exit'");
             }
         }

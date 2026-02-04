@@ -4,10 +4,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.InetSocketAddress;
-import java.util.Collections;
-import java.util.List;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;//Import the required data structures
 
 import rice.environment.Environment;
 import rice.p2p.commonapi.Application;
@@ -53,16 +50,16 @@ public class PeerNode implements Application {
         // TODO: Ex 2 - Prevent flooding by checking if the message ID was already received.
         // Hint: Use `receivedMessageIds.contains(msg.messageId)` to check duplicates.
         // If it's a duplicate, ignore it.
-        if(receivedMessageIds.contains(msg.messageId)){
+        if(receivedMessageIds.contains(msg.messageId)){//if the message has already been recorded ignore it-IT24104152
             return;
         }
+        receivedMessageIds.add(msg.messageId);//record the unrecorded messages-IT24104152
 
-        receivedMessageIds.add(msg.messageId);
         System.out.println("Received message from " + msg.sender + ": " + msg.content);
 
         // TODO: Ex 1 - If this is a broadcast message, forward it to other nodes.
         // Hint: Call `broadcastMessage(msg.content);` here if `msg.isBroadcast` is true.
-        if(msg.isBroadcast)
+        if(msg.isBroadcast)//If only the isBroadcast is set to true then forward it-IT24104152
             broadcastMessage(msg.content);
     }
 
@@ -73,7 +70,6 @@ public class PeerNode implements Application {
      * - Iterate over the neighbors and send a `SimpleMessage`.
      * - Use `endpoint.route()` to send messages.
      */
-
     public void broadcastMessage(String content) {
         p2p.SimpleMessage msg = new p2p.SimpleMessage(endpoint.getLocalNodeHandle(), content);
 
@@ -83,11 +79,14 @@ public class PeerNode implements Application {
         List<rice.pastry.NodeHandle> pastryNeighbors = node.getLeafSet().asList();
         
         // TODO: Ex 1 - Loop through `pastryNeighbors` and route the message to them.
-        for(rice.pastry.NodeHandle nodeHandle : pastryNeighbors) {
+        for(rice.pastry.NodeHandle nodeHandle : pastryNeighbors) {//Looping through the neighbors and sending them the messages-IT24104152
             endpoint.route(msg.sender.getId(), msg,  nodeHandle);
         }
     }
 
+    /**
+     * Handles unicast function-IT24104152
+     */
     public void unicastMessage(String idStr, String content) {
         p2p.SimpleMessage msg = new p2p.SimpleMessage(endpoint.getLocalNodeHandle(), content);
 
@@ -105,6 +104,9 @@ public class PeerNode implements Application {
         return;
     }
 
+    /**
+     * Handles multicast function-IT24104152
+     */
     public void multicastMessage(String[] nodeIds, String content) {
         p2p.SimpleMessage msg = new p2p.SimpleMessage(endpoint.getLocalNodeHandle(), content);
 
@@ -133,7 +135,7 @@ public class PeerNode implements Application {
     public boolean forward(RouteMessage message) {
         // TODO: Ex 1 - Enable forwarding to allow messages to be routed through the network.
         // Hint: Return `true` here instead of `false` if you want forwarding to be enabled.
-        return true;
+        return true;//Returns true for forwarding to be enabled-IT24104152
     }
 
     /**
@@ -147,6 +149,14 @@ public class PeerNode implements Application {
         }
     }
 
+
+    /**
+     * Helper method to check if a string is a valid node ID-IT24104152
+     */
+    private static boolean isNodeId(String string) {
+        // Example: Pastry node IDs are hex strings (length depends on your implementation, usually 40 chars)
+        return string.matches("[0-9a-fA-F]+");
+    }
 
     /**
      * Main method to start the peer node.
@@ -187,12 +197,13 @@ public class PeerNode implements Application {
             }
 
             System.out.println("Bootstrapping from localhost:" + bootstrapPort + "...");
-            node.boot(Collections.singletonList(new InetSocketAddress("172.28.8.120", bootstrapPort)));
+            node.boot(Collections.singletonList(new InetSocketAddress("192.168.1.8", bootstrapPort)));//The address is changed when required-IT24104152
         }
 
         // Wait for node initialization
         Thread.sleep(3000);
         System.out.println("PeerNode " + peer.nodeId + " is ready.");
+        //The instruction message is changed for the added functionalities of unicast, multicast, and getting information about the nodes-IT24104152
         System.out.println("Enter commands ('exit' to shut down, 'status' to check node info, 'broadcast <message>' to send a message to all nodes, 'unicast <node> <message>' to send unicast messages, 'multicast <node> ... <node> <message>' to multicast, 'get' to get information about current nodes) :");
 
         // Interactive CLI for user input
@@ -215,10 +226,10 @@ public class PeerNode implements Application {
                 
                 // TODO: Ex 1 - Call the broadcast method to send a message to all nodes.
                 // Hint: Use `peer.broadcastMessage(messageContent);`
-                peer.broadcastMessage(messageContent);
+                peer.broadcastMessage(messageContent);//added the broadcast functionality
                 
                 System.out.println("Broadcasting message: " + messageContent);
-            } else if(command.startsWith("unicast ")){
+            } else if(command.startsWith("unicast ")){//This else if block will handle the unicast functionality-IT24104152
                 String[] parts = command.split(" ", 3); // split into 3 parts: "unicast", "<nodeId>", "<message>"
                 if(parts.length < 3){
                     System.out.println("Usage: unicast <nodeId> <message>");
@@ -229,27 +240,29 @@ public class PeerNode implements Application {
                 String messageContent = parts[2]; // rest of the message
 
                 peer.unicastMessage(id, messageContent);
-            } else if(command.startsWith("multicast")){
+            } else if(command.startsWith("multicast")){//This else if block will handle the multicast functionality-IT24104152
                 String[] parts = command.split(" "); // split by spaces
-                if(parts.length < 3) { // at least: multicast <id> <message>
+                if(parts.length < 3) { // at least: multicast <id1> <message>
                     System.out.println("Usage: multicast <id1> <id2> ... <message>");
                     continue;
                 }
 
-                // Collect node IDs until the last part (message)
-                int numIds = parts.length - 2; // all except "multicast" and message
-                String[] nodeIds = new String[numIds];
-                System.arraycopy(parts, 1, nodeIds, 0, numIds);
-
-                // Reconstruct message (everything after IDs)
-                StringBuilder sb = new StringBuilder();
-                for(int i = numIds + 1; i < parts.length; i++) {
-                    sb.append(parts[i]).append(" ");
+                // Collect node IDs until the first part that is not a valid node ID
+                int firstMessageIndex = 1;
+                while(firstMessageIndex < parts.length && isNodeId(parts[firstMessageIndex])) {//this loop stops when it encounters that is not a node id using the helper method
+                    firstMessageIndex++;
                 }
-                String messageContent = sb.toString().trim();
+
+                if(firstMessageIndex == 1) {//if the loop never advanced then it means no valid node IDs were entered
+                    System.out.println("No valid node IDs provided.");
+                    continue;
+                }
+
+                String[] nodeIds = Arrays.copyOfRange(parts, 1, firstMessageIndex);//copies the node ID parts
+                String messageContent = String.join(" ", Arrays.copyOfRange(parts, firstMessageIndex, parts.length));//copies the non node ID parts
 
                 peer.multicastMessage(nodeIds, messageContent);
-            } else if(command.startsWith("get")){
+            } else if(command.startsWith("get")){//This else if block will handle obtaining the node ID-IT24104152
                 Set<String> printed = new HashSet<>();
                 for(NodeHandle nh : node.getLeafSet().asList()){
                     String id = nh.getId().toStringFull();
@@ -259,6 +272,7 @@ public class PeerNode implements Application {
                     }
                 }
              }else {
+                //The instruction message is changed for the added functionalities of unicast, multicast, and getting information about the nodes-IT24104152
                 System.out.println("Unknown command. Available commands: 'exit' to shut down, 'status' to check node info, 'broadcast <message>' to send a message to all nodes, 'unicast <node> <message>' to send unicast messages, 'multicast <node> ... <node> <message>' to multicast, 'get' to get information about current nodes");
             }
         }
